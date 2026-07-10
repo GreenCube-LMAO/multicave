@@ -78,10 +78,7 @@ canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-r
 // MULTIPLAYER - REAL WebSocket Server
 // ============================================================
 
-const WS_URL = "";
-
-let ws = null;
-let wsConnected = false;
+let firebaseConnected = false;
 let playerId = null;
 let playerName = "Player_" + Math.floor(Math.random() * 1000);
 let remotePlayers = {};
@@ -133,13 +130,22 @@ function connectWebSocket() {
   updateStatus("connecting", "Connecting...");
   
   try {
-    ws = new WebSocket(WS_URL);
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+} catch (e) {
+  console.error(e);
+  }
     
-    ws.onopen = function() {
-      wsConnected = true;
-      reconnectAttempts = 0;
-      updateStatus("online", "Online");
-      addChatMessage("system", "✅ Connected to server! Share the link to play with others.", true);
+    firebase.database().ref(".info/connected").on("value", function(snap) {
+  if (snap.val() === true) {
+    firebaseConnected = true;
+    updateStatus("online", "Online");
+    addChatMessage("system", "✅ Connected! Share the link to play with others.", true);
+  } else {
+    firebaseConnected = false;
+    updateStatus("offline", "Offline");
+  }
+});
       
       const joinMsg = {
         type: "join",
@@ -150,40 +156,45 @@ function connectWebSocket() {
         color: playerColor,
         rope: false
       };
-      ws.send(JSON.stringify(joinMsg));
       if (!playerId) playerId = joinMsg.id;
-      
-      setTimeout(() => {
-        sendPlayerUpdate();
-      }, 100);
+
+firebase.database().ref("players/" + playerId).set(joinMsg);
+
+setTimeout(() => {
+  sendPlayerUpdate();
+}, 100);
     };
     
-    ws.onmessage = function(event) {
-      try {
-        const data = JSON.parse(event.data);
-        handleMessage(data);
-      } catch (e) {
-        if (event.data && event.data.trim()) {
-          addChatMessage("server", event.data);
-        }
+firebase.database().ref("messages").on("child_added", function(snapshot) {
+  const data = snapshot.val();
+  handleMessage(data);
+});
       }
     };
     
-    ws.onclose = function() {
-      wsConnected = false;
-      updateStatus("offline", "Disconnected");
-      addChatMessage("system", "❌ Disconnected from server. Reconnecting...", true);
-      attemptReconnect();
+   firebase.database().ref(".info/connected").on("value", function(snap) {
+  if (snap.val() === true) {
+    firebaseConnected = true;
+    updateStatus("online", "Connected");
+  } else {
+    firebaseConnected = false;
+    updateStatus("offline", "Disconnected");
+  }
+}); 
     };
     
-    ws.onerror = function(err) {
-      wsConnected = false;
-      updateStatus("offline", "Error");
-      addChatMessage("system", "⚠️ Connection error. Retrying...", true);
-      attemptReconnect();
+    firebase.database().ref(".info/connected").on("value", function(snap) {
+  if (snap.val() === true) {
+    firebaseConnected = true;
+    updateStatus("online", "Connected");
+  } else {
+    firebaseConnected = false;
+    updateStatus("offline", "Offline");
+  }
+});
     };
   } catch (e) {
-    addChatMessage("system", "⚠️ WebSocket error. Running in local mode.", true);
+    addChatMessage("system", "⚠️ error. Running in local mode.", true);
     updateStatus("offline", "Local mode");
   }
 }
@@ -314,13 +325,13 @@ function sendPlayerUpdate() {
 }
 
 function sendChatMessage(text) {
-  if (!wsConnected || !ws) {
+  if (!firebaseConnected) {
     addChatMessage("system", "⚠️ Not connected to server. Message sent locally.", true);
     return false;
   }
   
   try {
-    ws.send(JSON.stringify({
+    db.ref(JSON.stringify({
       type: "chat",
       id: playerId,
       name: playerName,
@@ -840,11 +851,7 @@ document.addEventListener("keydown",e=>{
 
 setTimeout(() => {
   playerId = "player_" + Math.random().toString(36).substr(2, 6);
-  if (!wsConnected) {
-    setTimeout(connectWebSocket, 1000);
-  }
 }, 500);
-
 setTimeout(() => {
   addChatMessage("system", "💬 Share this link with friends to play together!", true);
   addChatMessage("system", "🟪 Purple players are real people like you!", true);
