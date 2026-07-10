@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MultiCave · real multiplayer</title>
+<title>MultiCave · multiplayer</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;user-select:none;-webkit-tap-highlight-color:transparent;}
 body{background:#0b0d10;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:Inter,sans-serif;padding:12px;}
-.game-wrapper{background:#13171c;border-radius:2.5rem;padding:1.2rem;max-width:960px;width:100%;}
-canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-radius:1.8rem;touch-action:none;}
+.game-wrapper{background:#13171c;border-radius:2.5rem;padding:1.2rem;max-width:960px;width:100%;box-shadow:0 20px 40px rgba(0,0,0,0.8),0 0 0 1px rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.02);}
+canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-radius:1.8rem;touch-action:none;box-shadow:inset 0 0 30px rgba(0,0,0,0.7);}
 .controls{display:flex;justify-content:center;gap:18px;padding:10px;}
-.ctrl-btn{width:72px;height:72px;border-radius:60px;border:1px solid #2f3e53;background:#1b232d;color:#d6e6ff;font-size:28px;cursor:pointer;}
-.ctrl-btn:active{transform:translateY(4px);}
+.ctrl-btn{width:72px;height:72px;border-radius:60px;border:1px solid #2f3e53;background:#1b232d;color:#d6e6ff;font-size:28px;cursor:pointer;box-shadow:0 6px 0 #0a0e12,0 8px 16px rgba(0,0,0,0.6);transition:all .08s ease;}
+.ctrl-btn:active{transform:translateY(4px);box-shadow:0 2px 0 #0a0e12;background:#26323f;border-color:#4d6a8a;}
 .rope-btn{background:#1e2a38;}
 .info-bar{display:flex;justify-content:space-between;color:#7d96b3;font-size:12px;padding:0 6px;flex-wrap:wrap;gap:4px;}
 .info-bar .status{display:flex;align-items:center;gap:6px;}
@@ -40,6 +40,7 @@ canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-r
 .name-input{flex:1;background:#141a22;border:1px solid #25303d;border-radius:16px;padding:4px 12px;color:#d0e0f0;font-size:12px;font-family:'Courier New',monospace;outline:none;}
 .name-input:focus{border-color:#4a7aaa;}
 .name-label{color:#6a8aaa;font-size:11px;}
+.badge{background:#1c2633;padding:2px 14px;border-radius:40px;border:1px solid #314a62;color:#b2cceb;font-weight:500;font-size:.7rem;}
 </style>
 </head>
 <body>
@@ -51,9 +52,9 @@ canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-r
 <button class="ctrl-btn" id="right">▶</button>
 </div>
 <div class="info-bar">
-<span>⬤ multi-cave · real multiplayer</span>
+<span>⬤ multi-cave · peak</span>
 <span class="status"><span class="status-dot connecting" id="statusDot"></span><span id="statusText">Connecting...</span></span>
-<span>🏁 finish: 5000</span>
+<span class="badge">🏁 finish: 5000</span>
 </div>
 <div class="chat-container">
 <div class="name-input-container">
@@ -61,7 +62,7 @@ canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-r
 <input class="name-input" id="nameInput" placeholder="Enter your name..." maxlength="20">
 </div>
 <div class="chat-messages" id="chatMessages">
-<div class="chat-message"><span class="time">[system]</span> 🌐 Connecting to multiplayer server...</div>
+<div class="chat-message"><span class="time">[system]</span> 🌐 Welcome to MultiCave!</div>
 </div>
 <div class="chat-input-row">
 <input class="chat-input" id="chatInput" placeholder="Type a message..." maxlength="60">
@@ -123,29 +124,23 @@ function updateStatus(state, text) {
 function connectFirebase() {
   updateStatus("connecting", "Connecting...");
   
-  // Check connection status
   const connectedRef = db.ref(".info/connected");
   connectedRef.on("value", function(snap) {
     if (snap.val() === true) {
       firebaseConnected = true;
       updateStatus("online", "Online");
-      addChatMessage("system", "✅ Connected to Firebase! Share the link to play with others.", true);
-      
-      // Join the game
+      addChatMessage("system", "✅ Connected! Share the link to play with friends.", true);
       joinGame();
     } else {
       firebaseConnected = false;
       updateStatus("offline", "Offline");
-      addChatMessage("system", "❌ Disconnected from Firebase. Reconnecting...", true);
     }
   });
 }
 
 function joinGame() {
-  // Create player reference
   playerRef = db.ref("players/" + playerId);
   
-  // Set player data
   const playerData = {
     id: playerId,
     name: playerName,
@@ -162,7 +157,6 @@ function joinGame() {
   
   playerRef.set(playerData);
   
-  // Listen for players joining/leaving/updating
   db.ref("players").on("child_added", function(snapshot) {
     const data = snapshot.val();
     if (data.id !== playerId) {
@@ -182,7 +176,7 @@ function joinGame() {
           finished: data.finished || false,
           joined: data.joined || Date.now()
         };
-        addChatMessage("system", `👋 ${remotePlayers[data.id].name} joined the game!`, true);
+        addChatMessage("system", `👋 ${remotePlayers[data.id].name} joined!`, true);
         updatePlayerCount();
       }
     }
@@ -201,7 +195,7 @@ function joinGame() {
       if (data.name && data.name !== remotePlayers[data.id].name) {
         const oldName = remotePlayers[data.id].name;
         remotePlayers[data.id].name = data.name;
-        addChatMessage("system", `📝 ${oldName} is now known as ${data.name}`, true);
+        addChatMessage("system", `📝 ${oldName} → ${data.name}`, true);
       }
     }
   });
@@ -211,12 +205,11 @@ function joinGame() {
     if (data.id && remotePlayers[data.id]) {
       const name = remotePlayers[data.id].name || "Player";
       delete remotePlayers[data.id];
-      addChatMessage("system", `👋 ${name} left the game.`, true);
+      addChatMessage("system", `👋 ${name} left.`, true);
       updatePlayerCount();
     }
   });
   
-  // Listen for chat messages
   db.ref("messages").on("child_added", function(snapshot) {
     const data = snapshot.val();
     if (data.id !== playerId) {
@@ -226,7 +219,6 @@ function joinGame() {
     }
   });
   
-  // Clean up old players
   setInterval(function() {
     const now = Date.now();
     for (let id in remotePlayers) {
@@ -249,11 +241,9 @@ let lastSendTime = 0;
 
 function sendPlayerUpdate() {
   if (!firebaseConnected || !playerRef) return;
-  
   const now = Date.now();
   if (now - lastSendTime < 50) return;
   lastSendTime = now;
-  
   try {
     playerRef.update({
       x: player.x,
@@ -269,10 +259,9 @@ function sendPlayerUpdate() {
 
 function sendChatMessage(text) {
   if (!firebaseConnected) {
-    addChatMessage("system", "⚠️ Not connected to server. Message sent locally.", true);
+    addChatMessage("system", "⚠️ Not connected. Message sent locally.", true);
     return false;
   }
-  
   try {
     const chatRef = db.ref("messages").push();
     chatRef.set({
@@ -283,24 +272,20 @@ function sendChatMessage(text) {
     });
     return true;
   } catch (e) {
-    addChatMessage("system", "⚠️ Failed to send message.", true);
+    addChatMessage("system", "⚠️ Failed to send.", true);
     return false;
   }
 }
 
 function sendFinish() {
   if (!firebaseConnected || !playerRef) return;
-  
   try {
     playerRef.update({ finished: true });
   } catch (e) {}
 }
 
-// Clean up on page unload
 window.addEventListener("beforeunload", function() {
-  if (playerRef) {
-    playerRef.remove();
-  }
+  if (playerRef) playerRef.remove();
 });
 
 // ============================================================
@@ -315,17 +300,13 @@ function addChatMessage(sender, message, isSystem = false, color = null) {
   const div = document.createElement("div");
   div.className = "chat-message";
   const time = new Date().toLocaleTimeString();
-  
   if (isSystem) {
     div.innerHTML = `<span class="time">[${time}]</span> <span style="color:#6a8aaa;">${message}</span>`;
   } else {
     const nameColor = color || "#ffffff";
     let emoji = "";
     for (let id in remotePlayers) {
-      if (remotePlayers[id].name === sender) {
-        emoji = "🟪";
-        break;
-      }
+      if (remotePlayers[id].name === sender) { emoji = "🟪"; break; }
     }
     if (sender === playerName) emoji = "🟩";
     div.innerHTML = `<span class="time">[${time}]</span> <span class="name" style="color:${nameColor}">${emoji} ${sender}:</span> ${message}`;
@@ -340,7 +321,6 @@ function addChatMessage(sender, message, isSystem = false, color = null) {
 function sendPlayerMessage() {
   const text = chatInput.value.trim();
   if (!text) return;
-  
   addChatMessage(playerName, text, false, playerColor);
   sendChatMessage(text);
   chatInput.value = "";
@@ -348,10 +328,7 @@ function sendPlayerMessage() {
 
 chatSend.addEventListener("click", sendPlayerMessage);
 chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    sendPlayerMessage();
-  }
+  if (e.key === "Enter") { e.preventDefault(); sendPlayerMessage(); }
 });
 
 // ============================================================
@@ -442,10 +419,6 @@ function makeCube(x,color){
 
 const player=makeCube(200,playerColor);
 
-// ============================================================
-// NO BOTS - Only real players!
-// ============================================================
-
 function getCaveBoundsAt(x) {
   const idx = Math.floor(x / 80);
   if (idx < 0 || idx >= cave.length) return null;
@@ -497,11 +470,9 @@ function respawnRing(ring){
 
 function physics(c,control){
   if(c.finished)return;
-
   if(control.left)c.vx-=0.20;
   if(control.right)c.vx+=0.20;
   c.vx*=c.ground?0.78:0.98;
-
   if(control.rope && !c.rope.active){
     let id=Math.floor(c.x/80);
     let section=cave[id];
@@ -514,7 +485,6 @@ function physics(c,control){
     }
   }
   if(!control.rope)c.rope.active=false;
-
   if(c.rope.active){
     let dx=c.x-c.rope.x, dy=c.y-c.rope.y;
     let dist=Math.sqrt(dx*dx+dy*dy);
@@ -540,13 +510,10 @@ function physics(c,control){
   } else {
     c.vy+=0.45;
   }
-
   c.x+=c.vx;
   c.y+=c.vy;
-
   const crossedRight = c.lastX + c.w <= FINISH && c.x + c.w > FINISH && c.vx > 0;
   const crossedLeft = c.lastX >= FINISH && c.x < FINISH;
-
   if(crossedRight){
     if(c === player && !finishLineCrossed){
       finishLineCrossed = true;
@@ -554,7 +521,7 @@ function physics(c,control){
       gameFinished = true;
       playerFinished = true;
       sendFinish();
-      addChatMessage("system", "🏆 You crossed the finish line! Bonus round activated!", true);
+      addChatMessage("system", "🏆 You finished! Bonus round activated!", true);
     }
   }
   if(crossedLeft && c.vx < 0){
@@ -562,7 +529,6 @@ function physics(c,control){
     c.vx = 0;
   }
   c.lastX = c.x;
-
   let section=cave[Math.floor(c.x/80)];
   if(section){
     let floor=section.bottom-c.h;
@@ -571,9 +537,7 @@ function physics(c,control){
     let ceiling=section.top+2;
     if(c.y<ceiling){ c.y=ceiling; c.vy=0; if(c.rope.active)c.rope.active=false; }
   }
-
   if(c.x+c.w>WALL_X){ c.x=WALL_X-c.w; c.vx=-Math.abs(c.vx)*0.5; }
-
   if(c===player && gameFinished){
     for(let r of bonusRings){
       if(!r.collected){
@@ -588,33 +552,20 @@ function physics(c,control){
       }
     }
   }
-
   if(c.y < 0){ c.y=0; c.vy=0; }
   if(c.y+c.h > CH){ c.y=CH-c.h; c.vy=0; }
   if(c.x < -200){ c.x=-200; c.vx=0; }
   if(c.x > FINISH+900){ c.x=FINISH+800; c.vx=0; }
 }
 
-// ============================================================
-// UPDATE & DRAW
-// ============================================================
-
 function update(){
   physics(player,input);
-
-  const allFinished = Object.values(remotePlayers).every(p => p.finished);
-  if(allFinished && finishLineCrossed && !gameFinished){
-    gameFinished = true;
-    spawnBonusRings();
-  }
-
   let t=Date.now()/1000;
   for(let r of bonusRings){
     if(!r.collected){
       r.y += Math.sin(t*2 + r.bobOffset) * 0.08;
     }
   }
-  
   sendPlayerUpdate();
 }
 
@@ -623,7 +574,6 @@ function draw(){
   ctx.clearRect(0,0,CW,CH);
   ctx.fillStyle="#101020";
   ctx.fillRect(0,0,CW,CH);
-
   ctx.fillStyle="#555";
   cave.forEach((s,i)=>{
     let x=i*80-cam;
@@ -632,7 +582,6 @@ function draw(){
       ctx.fillRect(x,s.bottom,80,CH-s.bottom);
     }
   });
-
   ctx.fillStyle="rgba(255,200,50,.25)";
   ctx.fillRect(FINISH-cam,0,8,CH);
   ctx.fillStyle="#ffdd44";
@@ -641,7 +590,6 @@ function draw(){
   ctx.fillText("▶",FINISH-cam+10,CH-15);
   ctx.font="bold 14px Inter";
   ctx.fillText("🏁 FINISH",FINISH-cam-40,25);
-
   if(gameFinished || finishLineCrossed){
     for(let r of bonusRings){
       let rx=r.x-cam;
@@ -671,16 +619,12 @@ function draw(){
       }
     }
   }
-
   ctx.fillStyle="#8a2a2a";
   ctx.fillRect(WALL_X-cam,0,12,CH);
-
-  // Draw remote players (real players only - NO BOTS!)
   const sortedPlayers = Object.values(remotePlayers).sort((a,b) => a.x - b.x);
   for (let rp of sortedPlayers) {
     const x = rp.x - cam;
     const y = rp.y;
-    
     if (x > -50 && x < CW + 50) {
       if (rp.rope) {
         ctx.strokeStyle="rgba(255,255,255,0.25)";
@@ -692,19 +636,16 @@ function draw(){
         ctx.stroke();
         ctx.setLineDash([]);
       }
-      
       ctx.fillStyle = rp.color || "#8888ff";
       ctx.shadowColor = "rgba(100,100,255,0.3)";
       ctx.shadowBlur = 10;
       ctx.fillRect(x, y, 26, 26);
       ctx.shadowBlur = 0;
-      
       ctx.fillStyle = rp.color || "#8888ff";
       ctx.font = "9px Inter";
       ctx.textAlign = "center";
       const displayName = rp.name || "Player";
       ctx.fillText("🟪 " + displayName, x + 13, y - 6);
-      
       if (rp.finished) {
         ctx.fillStyle = "#ffd700";
         ctx.font = "14px Inter";
@@ -712,10 +653,7 @@ function draw(){
       }
     }
   }
-
-  // Draw local player
   const c = player;
-  
   if(c.rope.active){
     ctx.strokeStyle="#44ff44";
     ctx.lineWidth=3;
@@ -731,28 +669,22 @@ function draw(){
     ctx.arc(c.rope.x-cam,c.rope.y,8,0,Math.PI*2);
     ctx.fill();
   }
-
   ctx.fillStyle=c.color;
   ctx.shadowColor = "rgba(68,255,68,0.3)";
   ctx.shadowBlur = 15;
   ctx.fillRect(c.x-cam,c.y,c.w,c.h);
   ctx.shadowBlur=0;
-
   ctx.fillStyle = "#44ff44";
   ctx.font = "bold 10px Inter";
   ctx.textAlign = "center";
   ctx.fillText("🟩 You", c.x-cam+c.w/2, c.y-8);
-
-  // HUD
   ctx.fillStyle="#6f8bb0";
   ctx.font="12px Inter";
   const playerCount = Object.keys(remotePlayers).length;
-  ctx.fillText(`👥 ${playerCount + 1} players online`,20,30);
-
+  ctx.fillText(`👥 ${playerCount + 1} online`,20,30);
   ctx.fillStyle="#ffd700";
   ctx.font="bold 14px Inter";
   ctx.fillText(`⭐ ${score}`,CW-80,30);
-
   if(gameFinished || finishLineCrossed){
     ctx.fillStyle="#88ddff";
     ctx.font="12px Inter";
@@ -765,26 +697,18 @@ function draw(){
   }
 }
 
-// ============================================================
-// LOOP
-// ============================================================
-
 function loop(){
   update();
   draw();
   requestAnimationFrame(loop);
 }
 
-// Start Firebase connection
 connectFirebase();
 loop();
 
 canvas.addEventListener("contextmenu",e=>e.preventDefault());
-
 document.addEventListener("keydown",e=>{
-  if(e.key==="ArrowLeft" || e.key==="ArrowRight" || e.key===" "){
-    e.preventDefault();
-  }
+  if(e.key==="ArrowLeft" || e.key==="ArrowRight" || e.key===" ") e.preventDefault();
 });
 
 setTimeout(() => {
