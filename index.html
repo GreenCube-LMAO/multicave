@@ -69,6 +69,8 @@ canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-r
 </div>
 </div>
 </div>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
 (function(){
 
@@ -83,6 +85,21 @@ let wsConnected = false;
 let playerId = null;
 let playerName = "Player_" + Math.floor(Math.random() * 1000);
 let remotePlayers = {};
+  const firebaseConfig = {
+  apiKey: "AIzaSyAe52ock2VnkkNocxUYsJlZYE5OBYS5_3Q",
+  authDomain: "multicave-75b44.firebaseapp.com",
+  databaseURL: "https://multicave-75b44-default-rtdb.firebaseio.com/",
+  projectId: "multicave-75b44",
+  appId: ""1:241049834729:web:e1c056457707e975a30c78"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+
+const playerId = "player_" + Math.random().toString(36).slice(2,8);
+
+const playerRef = db.ref("players/" + playerId);
 let reconnectAttempts = 0;
 let maxReconnectAttempts = 10;
 let reconnectTimeout = null;
