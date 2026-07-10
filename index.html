@@ -206,14 +206,6 @@ function attemptReconnect() {
     return;
   }
   
-  reconnectAttempts++;
-  const delay = Math.min(1000 * reconnectAttempts, 10000);
-  
-  if (reconnectTimeout) clearTimeout(reconnectTimeout);
-  reconnectTimeout = setTimeout(() => {
-    addChatMessage("system", `🔄 Reconnecting (attempt ${reconnectAttempts})...`, true);
-    connectWebSocket();
-  }, delay);
 }
 
 function handleMessage(data) {
