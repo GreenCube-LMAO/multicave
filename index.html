@@ -69,37 +69,35 @@ canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-r
 </div>
 </div>
 </div>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
 (function(){
 
 // ============================================================
-// MULTIPLAYER - REAL WebSocket Server
+// FIREBASE CONFIG
 // ============================================================
 
-let firebaseConnected = false;
-let playerId = null;
-let playerName = "Player_" + Math.floor(Math.random() * 1000);
-let remotePlayers = {};
-  const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyAe52ock2VnkkNocxUYsJlZYE5OBYS5_3Q",
   authDomain: "multicave-75b44.firebaseapp.com",
   databaseURL: "https://multicave-75b44-default-rtdb.firebaseio.com/",
   projectId: "multicave-75b44",
-  appId: ""1:241049834729:web:e1c056457707e975a30c78"
+  appId: "1:241049834729:web:e1c056457707e975a30c78"
 };
 
 firebase.initializeApp(firebaseConfig);
-
 const db = firebase.database();
 
-const playerId = "player_" + Math.random().toString(36).slice(2,8);
+// ============================================================
+// MULTIPLAYER - FIREBASE REALTIME DATABASE
+// ============================================================
 
-const playerRef = db.ref("players/" + playerId);
-let reconnectAttempts = 0;
-let maxReconnectAttempts = 10;
-let reconnectTimeout = null;
+let firebaseConnected = false;
+let playerId = "player_" + Math.random().toString(36).substr(2, 8);
+let playerName = "Player_" + Math.floor(Math.random() * 1000);
+let remotePlayers = {};
+let playerRef = null;
 let playerColor = "#44ff44";
 const playerColors = ["#44ff44", "#ff6b6b", "#ffd93d", "#6bcb77", "#4d96ff", "#9b59b6", "#ff6b35", "#74b9ff", "#a29bfe", "#fd79a8"];
 
@@ -112,12 +110,8 @@ playerColor = playerColors[Math.floor(Math.random() * playerColors.length)];
 nameInput.value = playerName;
 nameInput.addEventListener("change", function() {
   playerName = this.value.trim() || "Player_" + Math.floor(Math.random() * 1000);
-  if (wsConnected && ws) {
-    ws.send(JSON.stringify({
-      type: "namechange",
-      id: playerId,
-      name: playerName
-    }));
+  if (firebaseConnected && playerRef) {
+    playerRef.update({ name: playerName });
   }
 });
 
@@ -126,164 +120,124 @@ function updateStatus(state, text) {
   statusText.textContent = text;
 }
 
-function connectWebSocket() {
+function connectFirebase() {
   updateStatus("connecting", "Connecting...");
   
-  try {
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-} catch (e) {
-  console.error(e);
-  }
-    
-    firebase.database().ref(".info/connected").on("value", function(snap) {
-  if (snap.val() === true) {
-    firebaseConnected = true;
-    updateStatus("online", "Online");
-    addChatMessage("system", "✅ Connected! Share the link to play with others.", true);
-  } else {
-    firebaseConnected = false;
-    updateStatus("offline", "Offline");
-  }
-});
+  // Check connection status
+  const connectedRef = db.ref(".info/connected");
+  connectedRef.on("value", function(snap) {
+    if (snap.val() === true) {
+      firebaseConnected = true;
+      updateStatus("online", "Online");
+      addChatMessage("system", "✅ Connected to Firebase! Share the link to play with others.", true);
       
-      const joinMsg = {
-        type: "join",
-        id: playerId || "player_" + Math.random().toString(36).substr(2, 6),
-        name: playerName || "Player",
-        x: player.x,
-        y: player.y,
-        color: playerColor,
-        rope: false
-      };
-      if (!playerId) playerId = joinMsg.id;
-
-firebase.database().ref("players/" + playerId).set(joinMsg);
-
-setTimeout(() => {
-  sendPlayerUpdate();
-}, 100);
-    };
-    
-firebase.database().ref("messages").on("child_added", function(snapshot) {
-  const data = snapshot.val();
-  handleMessage(data);
-});
-      }
-    };
-    
-   firebase.database().ref(".info/connected").on("value", function(snap) {
-  if (snap.val() === true) {
-    firebaseConnected = true;
-    updateStatus("online", "Connected");
-  } else {
-    firebaseConnected = false;
-    updateStatus("offline", "Disconnected");
-  }
-}); 
-    };
-    
-    firebase.database().ref(".info/connected").on("value", function(snap) {
-  if (snap.val() === true) {
-    firebaseConnected = true;
-    updateStatus("online", "Connected");
-  } else {
-    firebaseConnected = false;
-    updateStatus("offline", "Offline");
-  }
-});
-    };
-  } catch (e) {
-    addChatMessage("system", "⚠️ error. Running in local mode.", true);
-    updateStatus("offline", "Local mode");
-  }
+      // Join the game
+      joinGame();
+    } else {
+      firebaseConnected = false;
+      updateStatus("offline", "Offline");
+      addChatMessage("system", "❌ Disconnected from Firebase. Reconnecting...", true);
+    }
+  });
 }
 
-function attemptReconnect() {
-  if (reconnectAttempts >= maxReconnectAttempts) {
-    addChatMessage("system", "❌ Max reconnect attempts reached. Refresh to try again.", true);
-    updateStatus("offline", "Failed");
-    return;
-  }
+function joinGame() {
+  // Create player reference
+  playerRef = db.ref("players/" + playerId);
   
-}
-
-function handleMessage(data) {
-  switch(data.type) {
-    case "join":
-      if (data.id !== playerId) {
-        if (!remotePlayers[data.id]) {
-          remotePlayers[data.id] = {
-            id: data.id,
-            name: data.name || "Player",
-            x: data.x || 270,
-            y: data.y || 270,
-            vx: 0,
-            vy: 0,
-            color: data.color || "#8888ff",
-            rope: false,
-            ropeX: 0,
-            ropeY: 0,
-            lastUpdate: Date.now(),
-            finished: false,
-            joined: Date.now()
-          };
-          addChatMessage("system", `👋 ${remotePlayers[data.id].name} joined the game!`, true);
-          updatePlayerCount();
-        }
-      }
-      break;
-      
-    case "update":
-      if (data.id && data.id !== playerId && remotePlayers[data.id]) {
-        remotePlayers[data.id].x = data.x || remotePlayers[data.id].x;
-        remotePlayers[data.id].y = data.y || remotePlayers[data.id].y;
-        remotePlayers[data.id].vx = data.vx || 0;
-        remotePlayers[data.id].vy = data.vy || 0;
-        remotePlayers[data.id].rope = data.rope || false;
-        remotePlayers[data.id].ropeX = data.ropeX || 0;
-        remotePlayers[data.id].ropeY = data.ropeY || 0;
-        remotePlayers[data.id].lastUpdate = Date.now();
-        remotePlayers[data.id].finished = data.finished || false;
-      }
-      break;
-      
-    case "chat":
-      if (data.id !== playerId) {
-        const name = remotePlayers[data.id]?.name || data.name || "Player";
-        const color = remotePlayers[data.id]?.color || "#ffffff";
-        addChatMessage(name, data.message, false, color);
-      }
-      break;
-      
-    case "namechange":
-      if (data.id !== playerId && remotePlayers[data.id]) {
-        const oldName = remotePlayers[data.id].name;
-        remotePlayers[data.id].name = data.name || "Player";
-        addChatMessage("system", `📝 ${oldName} is now known as ${data.name}`, true);
-      }
-      break;
-      
-    case "leave":
-      if (data.id && remotePlayers[data.id]) {
-        const name = remotePlayers[data.id].name || "Player";
-        delete remotePlayers[data.id];
-        addChatMessage("system", `👋 ${name} left the game.`, true);
+  // Set player data
+  const playerData = {
+    id: playerId,
+    name: playerName,
+    x: player.x,
+    y: player.y,
+    color: playerColor,
+    rope: false,
+    ropeX: 0,
+    ropeY: 0,
+    finished: false,
+    lastUpdate: Date.now(),
+    joined: Date.now()
+  };
+  
+  playerRef.set(playerData);
+  
+  // Listen for players joining/leaving/updating
+  db.ref("players").on("child_added", function(snapshot) {
+    const data = snapshot.val();
+    if (data.id !== playerId) {
+      if (!remotePlayers[data.id]) {
+        remotePlayers[data.id] = {
+          id: data.id,
+          name: data.name || "Player",
+          x: data.x || 270,
+          y: data.y || 270,
+          vx: 0,
+          vy: 0,
+          color: data.color || "#8888ff",
+          rope: data.rope || false,
+          ropeX: data.ropeX || 0,
+          ropeY: data.ropeY || 0,
+          lastUpdate: Date.now(),
+          finished: data.finished || false,
+          joined: data.joined || Date.now()
+        };
+        addChatMessage("system", `👋 ${remotePlayers[data.id].name} joined the game!`, true);
         updatePlayerCount();
       }
-      break;
-      
-    case "finish":
-      if (data.id !== playerId && remotePlayers[data.id]) {
-        const name = remotePlayers[data.id].name || "Player";
-        remotePlayers[data.id].finished = true;
-        addChatMessage("system", `🏁 ${name} finished the race!`, true);
+    }
+  });
+  
+  db.ref("players").on("child_changed", function(snapshot) {
+    const data = snapshot.val();
+    if (data.id !== playerId && remotePlayers[data.id]) {
+      remotePlayers[data.id].x = data.x || remotePlayers[data.id].x;
+      remotePlayers[data.id].y = data.y || remotePlayers[data.id].y;
+      remotePlayers[data.id].rope = data.rope || false;
+      remotePlayers[data.id].ropeX = data.ropeX || 0;
+      remotePlayers[data.id].ropeY = data.ropeY || 0;
+      remotePlayers[data.id].finished = data.finished || false;
+      remotePlayers[data.id].lastUpdate = Date.now();
+      if (data.name && data.name !== remotePlayers[data.id].name) {
+        const oldName = remotePlayers[data.id].name;
+        remotePlayers[data.id].name = data.name;
+        addChatMessage("system", `📝 ${oldName} is now known as ${data.name}`, true);
       }
-      break;
-      
-    default:
-      break;
-  }
+    }
+  });
+  
+  db.ref("players").on("child_removed", function(snapshot) {
+    const data = snapshot.val();
+    if (data.id && remotePlayers[data.id]) {
+      const name = remotePlayers[data.id].name || "Player";
+      delete remotePlayers[data.id];
+      addChatMessage("system", `👋 ${name} left the game.`, true);
+      updatePlayerCount();
+    }
+  });
+  
+  // Listen for chat messages
+  db.ref("messages").on("child_added", function(snapshot) {
+    const data = snapshot.val();
+    if (data.id !== playerId) {
+      const name = remotePlayers[data.id]?.name || data.name || "Player";
+      const color = remotePlayers[data.id]?.color || "#ffffff";
+      addChatMessage(name, data.message, false, color);
+    }
+  });
+  
+  // Clean up old players
+  setInterval(function() {
+    const now = Date.now();
+    for (let id in remotePlayers) {
+      if (now - remotePlayers[id].lastUpdate > 15000) {
+        delete remotePlayers[id];
+        updatePlayerCount();
+      }
+    }
+  }, 5000);
+  
+  updatePlayerCount();
 }
 
 function updatePlayerCount() {
@@ -294,25 +248,22 @@ function updatePlayerCount() {
 let lastSendTime = 0;
 
 function sendPlayerUpdate() {
-  if (!wsConnected || !ws || !playerId) return;
+  if (!firebaseConnected || !playerRef) return;
   
   const now = Date.now();
   if (now - lastSendTime < 50) return;
   lastSendTime = now;
   
   try {
-    ws.send(JSON.stringify({
-      type: "update",
-      id: playerId,
+    playerRef.update({
       x: player.x,
       y: player.y,
-      vx: player.vx,
-      vy: player.vy,
       rope: player.rope.active,
       ropeX: player.rope.x,
       ropeY: player.rope.y,
-      finished: player.finished || false
-    }));
+      finished: player.finished || false,
+      lastUpdate: Date.now()
+    });
   } catch (e) {}
 }
 
@@ -323,12 +274,13 @@ function sendChatMessage(text) {
   }
   
   try {
-    db.ref(JSON.stringify({
-      type: "chat",
+    const chatRef = db.ref("messages").push();
+    chatRef.set({
       id: playerId,
       name: playerName,
-      message: text
-    }));
+      message: text,
+      timestamp: Date.now()
+    });
     return true;
   } catch (e) {
     addChatMessage("system", "⚠️ Failed to send message.", true);
@@ -337,25 +289,19 @@ function sendChatMessage(text) {
 }
 
 function sendFinish() {
-  if (!wsConnected || !ws) return;
+  if (!firebaseConnected || !playerRef) return;
   
   try {
-    ws.send(JSON.stringify({
-      type: "finish",
-      id: playerId
-    }));
+    playerRef.update({ finished: true });
   } catch (e) {}
 }
 
-function cleanupRemotePlayers() {
-  const now = Date.now();
-  for (let id in remotePlayers) {
-    if (now - remotePlayers[id].lastUpdate > 15000) {
-      delete remotePlayers[id];
-      updatePlayerCount();
-    }
+// Clean up on page unload
+window.addEventListener("beforeunload", function() {
+  if (playerRef) {
+    playerRef.remove();
   }
-}
+});
 
 // ============================================================
 // CHAT SYSTEM
@@ -670,7 +616,6 @@ function update(){
   }
   
   sendPlayerUpdate();
-  if (Math.random() < 0.01) cleanupRemotePlayers();
 }
 
 function draw(){
@@ -830,6 +775,7 @@ function loop(){
   requestAnimationFrame(loop);
 }
 
+// Start Firebase connection
 connectFirebase();
 loop();
 
@@ -841,9 +787,6 @@ document.addEventListener("keydown",e=>{
   }
 });
 
-setTimeout(() => {
-  playerId = "player_" + Math.random().toString(36).substr(2, 6);
-}, 500);
 setTimeout(() => {
   addChatMessage("system", "💬 Share this link with friends to play together!", true);
   addChatMessage("system", "🟪 Purple players are real people like you!", true);
