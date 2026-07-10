@@ -78,7 +78,7 @@ canvas{display:block;width:100%;aspect-ratio:960/540;background:#0f1219;border-r
 // MULTIPLAYER - REAL WebSocket Server
 // ============================================================
 
-const WS_URL = "wss://ws.postman-echo.com/raw";
+const WS_URL = "";
 
 let ws = null;
 let wsConnected = false;
@@ -827,7 +827,7 @@ function loop(){
   requestAnimationFrame(loop);
 }
 
-connectWebSocket();
+
 loop();
 
 canvas.addEventListener("contextmenu",e=>e.preventDefault());
